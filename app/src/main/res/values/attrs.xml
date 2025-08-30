@@ -1,0 +1,6 @@
+<resources>
+    <attr name="colorBackground" format="color" />
+    <attr name="shapeSmall" format="reference" />
+    <attr name="shapeMedium" format="reference" />
+    <attr name="shapeLarge" format="reference" />
+</resources>

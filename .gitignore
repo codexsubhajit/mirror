@@ -1,0 +1,8 @@
+# Ignore build artifacts and large files
+*.hprof
+*.apk
+*.aab
+/app/build/
+/app/release/
+/app/intermediates/
+*.so
