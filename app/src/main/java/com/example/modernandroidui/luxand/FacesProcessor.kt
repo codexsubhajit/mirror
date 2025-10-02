@@ -16,6 +16,7 @@ import android.view.View
 import androidx.camera.core.ImageProxy
 import com.luxand.FSDK
 import com.example.modernandroidui.session.SessionManager
+import com.example.modernandroidui.ui.screens.FaceStrictPrefs
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -610,7 +611,7 @@ object FacesProcessor {
                                 FSDK.DetectFacialAttributeUsingFeatures(
                                     image,
                                     feature,
-                                    "Confidence",
+                                    "Liveness",
                                     resultLiveness,
                                     1024
                                 )
@@ -618,13 +619,13 @@ object FacesProcessor {
                                     tracker,
                                     0,
                                     ids[0],
-                                    "Confidence",
+                                    "Liveness",
                                     resultLiveness,
                                     1024
                                 );
-                                Log.i("acceptV3D", "Liveness ${resultLiveness[0]}")
-                                livenessScore2 = resultLiveness[0].split("Confidence=")[0].toFloatOrNull()
-
+                                Log.i("acceptV3", "Liveness ${resultLiveness[0]}")
+                                livenessScore2 = resultLiveness[0].split("Liveness=")[1].toFloatOrNull()
+                                Log.i("acceptV3", "livenessScore2 $livenessScore2")
                                 for (pair in resultImg[0].split(";")) {
                                     val values = pair.split("=")
                                     if (values.size == 2) {
@@ -690,18 +691,20 @@ object FacesProcessor {
 //                        SessionManager.lightCondition = 0
 //                        SessionManager.setText(statusMessage)
 //                    }
-//                        if (livenessScore2 != null && livenessScore2 < 0.5f) {
-//
-//                            val statusMessage = "Face is partially occluded or of low quality. Please remove any obstruction and try again."
-//                            Log.d("acceptV3", statusMessage)
-//                            SessionManager.lightCondition = 0
-//                            SessionManager.setText(statusMessage)
-//                        }
-                        //else{
+                    val faceStrictEnabled = FaceStrictPrefs.get(SessionManager.getAppContext())
+
+                    if (faceStrictEnabled && livenessScore2 != null && livenessScore2 < 0.6f) {
+
+                            val statusMessage = "Show Actual Face"
+                            Log.d("acceptV3", statusMessage)
+                            SessionManager.lightCondition = 0
+                            SessionManager.setText(statusMessage)
+                        }
+                        else{
                             Log.d("acceptV3", "Perfect! Hold on")
                             SessionManager.lightCondition = 1
                             SessionManager.setText("Perfect! Hold on")
-                        //}
+                        }
 
 
                 }

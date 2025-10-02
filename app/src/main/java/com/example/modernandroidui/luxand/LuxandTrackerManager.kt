@@ -103,6 +103,10 @@ class LuxandTrackerManager(private val context: Context) {
             val saveResult = FSDK.SaveTrackerMemoryToFile(it, file.absolutePath)
             if (saveResult == FSDK.FSDKE_OK) {
                 Log.i(TAG, "Tracker memory saved to faces.dat")
+                Log.d(
+                    "SyncNowFull",
+                    "Tracker memory saved to faces.dat"
+                )
             } else {
                 Log.e(TAG, "Failed to save tracker memory: $saveResult")
             }

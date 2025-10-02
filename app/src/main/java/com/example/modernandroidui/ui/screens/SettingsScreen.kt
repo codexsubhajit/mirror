@@ -21,11 +21,33 @@ import org.json.JSONObject
 
 data class Branch(val id: Int, val name: String)
 
+// Helper for Face Strict SharedPreferences
+object FaceStrictPrefs {
+    private const val PREF_NAME = "face_strict_prefs"
+    private const val KEY_FACE_STRICT = "face_strict_enabled"
+    fun get(context: android.content.Context): Boolean {
+        val prefs = context.getSharedPreferences(PREF_NAME, android.content.Context.MODE_PRIVATE)
+        return if (!prefs.contains(KEY_FACE_STRICT)) {
+            // Default to true if not set
+            set(context, true)
+            true
+        } else {
+            prefs.getBoolean(KEY_FACE_STRICT, false)
+        }
+    }
+    fun set(context: android.content.Context, enabled: Boolean) {
+        context.getSharedPreferences(PREF_NAME, android.content.Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_FACE_STRICT, enabled).apply()
+    }
+}
+
 class SettingsViewModel(private val context: android.content.Context) : ViewModel() {
     private val TAG = "SettingsViewModel"
     private val dataStore = SettingsDataStore(context)
     private val branchDataStore = BranchDataStore(context)
     var geofencingEnabled by mutableStateOf(false)
+        private set
+    var faceStrictEnabled by mutableStateOf(false)
         private set
     var isLoading by mutableStateOf(false)
         private set
@@ -55,6 +77,9 @@ class SettingsViewModel(private val context: android.content.Context) : ViewMode
                 selectedBranchId = id
             }
         }
+
+        // Load Face Strict from SharedPreferences
+        faceStrictEnabled = FaceStrictPrefs.get(context)
     }
 
     fun updateGeofencingEnabled(enabled: Boolean) {
@@ -73,6 +98,12 @@ class SettingsViewModel(private val context: android.content.Context) : ViewMode
             selectedBranchId = null
             selectedBranchName = null
         }
+    }
+
+    fun updateFaceStrictEnabled(enabled: Boolean) {
+        android.util.Log.d(TAG, "[UI] updateFaceStrictEnabled called with: $enabled")
+        faceStrictEnabled = enabled
+        FaceStrictPrefs.set(context, enabled)
     }
 
     fun fetchBranchList() {
@@ -171,6 +202,14 @@ fun SettingsScreen(
             Switch(
                 checked = viewModel.geofencingEnabled,
                 onCheckedChange = { viewModel.updateGeofencingEnabled(it) }
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Face strict", modifier = Modifier.weight(1f))
+            Switch(
+                checked = viewModel.faceStrictEnabled,
+                onCheckedChange = { viewModel.updateFaceStrictEnabled(it) }
             )
         }
         if (viewModel.geofencingEnabled) {

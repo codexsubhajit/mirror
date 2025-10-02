@@ -6,6 +6,16 @@ object SessionManager {
     private const val EMPLOYER_ID_KEY = "employer_id"
     private const val KEY_SYNC_DONE = "sync_done"
 
+    @Volatile
+    private var appContext: Context? = null
+    fun setAppContext(context: Context) {
+        appContext = context.applicationContext
+    }
+    fun getAppContext(): Context {
+        return appContext ?: throw IllegalStateException("App context not set. Call SessionManager.setAppContext(context) in Application.onCreate().")
+    }
+
+
     fun setSyncDone(context: Context, done: Boolean) {
         val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
         prefs.edit().putBoolean(KEY_SYNC_DONE, done).apply()

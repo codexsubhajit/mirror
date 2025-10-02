@@ -249,10 +249,12 @@ fun RegistrationScreen(
         val cameraProvider = cameraProviderFuture.get()
         val previewView = previewViewRef.value ?: return@LaunchedEffect
         val facesFile = java.io.File(context.filesDir, "faces.dat")
-        if (com.example.modernandroidui.luxand.FacesProcessor.shouldReload(facesFile)) {
-            com.example.modernandroidui.luxand.FacesProcessor.load(facesFile)
-            com.example.modernandroidui.luxand.FacesProcessor.updateLastLoaded(facesFile)
-        }
+        com.example.modernandroidui.luxand.FacesProcessor.load(facesFile)
+
+//        if (com.example.modernandroidui.luxand.FacesProcessor.shouldReload(facesFile)) {
+//            com.example.modernandroidui.luxand.FacesProcessor.load(facesFile)
+//            com.example.modernandroidui.luxand.FacesProcessor.updateLastLoaded(facesFile)
+//        }
         val targetSize = android.util.Size(1280, 720)
         val resolutionSelector = androidx.camera.core.resolutionselector.ResolutionSelector.Builder()
             .setAllowedResolutionMode(androidx.camera.core.resolutionselector.ResolutionSelector.PREFER_CAPTURE_RATE_OVER_HIGHER_RESOLUTION)

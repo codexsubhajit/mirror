@@ -25,6 +25,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
+import com.example.modernandroidui.luxand.FacesProcessor
 import com.example.modernandroidui.session.SessionManager
 import com.example.modernandroidui.util.NetworkUtil
 import kotlinx.coroutines.flow.asStateFlow
@@ -302,8 +303,9 @@ class MainViewModel : ViewModel() {
                 withContext(Dispatchers.IO) {
                     if (NetworkUtil.isInternetAvailable(context)) {
                         // --- EMPLOYEE/FACE SYNC (existing logic) ---
-                        luxandTrackerManager.initialize()
+                        // luxandTrackerManager.initialize()
                         val facesDatFile = File(context.filesDir, "faces.dat")
+                        FacesProcessor.load(facesDatFile)
                         if (facesDatFile.exists()) {
                             facesDatFile.writeBytes(byteArrayOf())
                             Log.d("SyncNowFull", "faces.dat cleared before merging")
@@ -373,30 +375,40 @@ class MainViewModel : ViewModel() {
                             var faceRegistered = false
                             var faceId: Long? = null
                             if (jsonTrackData != null) {
-                                val faces = jsonTrackData.optJSONArray("faces")
-                                if (faces != null && faces.length() > 0) {
-                                    val faceObj = faces.getJSONObject(0)
-                                    val templateBase64 = faceObj.optString("template")
-                                    if (templateBase64.isNotBlank() && tracker != null) {
-                                        val templateBytes = android.util.Base64.decode(
-                                            templateBase64,
-                                            android.util.Base64.DEFAULT
-                                        )
-                                        faceRegistered = true
-                                        faceId = faceObj.optLong("face_id", -1)
-                                        if (faceId != -1L) {
-                                            faceMapEntities.add(
-                                                FaceMapEntity(
-                                                    faceId,
-                                                    id,
-                                                    name,
-                                                    mobile,
-                                                    branch
-                                                )
-                                            )
-                                        }
-                                    }
-                                }
+                                faceRegistered = true
+//                                faceMapEntities.add(
+//                                    FaceMapEntity(
+//                                        faceId,
+//                                        id,
+//                                        name,
+//                                        mobile,
+//                                        branch
+//                                    )
+//                                )
+                                //val faces = jsonTrackData.optJSONArray("faces")
+//                                if (faces != null && faces.length() > 0) {
+//                                    val faceObj = faces.getJSONObject(0)
+//                                    val templateBase64 = faceObj.optString("template")
+//                                    if (templateBase64.isNotBlank() && tracker != null) {
+//                                        val templateBytes = android.util.Base64.decode(
+//                                            templateBase64,
+//                                            android.util.Base64.DEFAULT
+//                                        )
+//                                        faceRegistered = true
+//                                        faceId = faceObj.optLong("face_id", -1)
+//                                        if (faceId != -1L) {
+//                                            faceMapEntities.add(
+//                                                FaceMapEntity(
+//                                                    faceId,
+//                                                    id,
+//                                                    name,
+//                                                    mobile,
+//                                                    branch
+//                                                )
+//                                            )
+//                                        }
+//                                    }
+//                                }
                             }
                             Log.i(
                                 "mainViewModel",
@@ -421,7 +433,11 @@ class MainViewModel : ViewModel() {
                         _departmentList.value = departmentSet.toList().sorted()
                         employeeDao.insertAll(employeeEntities)
                         faceMapDao.insertAll(faceMapEntities)
-                        luxandTrackerManager.saveTrackerMemory()
+//                        luxandTrackerManager.saveTrackerMemory()
+//                        Log.d(
+//                            "SyncNowFull",
+//                            "luxandTrackerManager saving dat"
+//                        )
                         val jsonTrackDataFiles = mutableListOf<File>()
                         for (emp in allEmployees) {
                             val jsonTrackData = emp.optJSONObject("json_trackedata")
@@ -520,10 +536,13 @@ class MainViewModel : ViewModel() {
 //
 //                    l_track++
                 }
-                val outFile = File(context.filesDir, "faces.dat")
-                mergedTrackerData?.callAttr("save_to_binary", outFile.absolutePath)
-                _mergeLogs.value += "Saved merged tracker to faces.dat\n"
-                Log.d("ChaquopyMerge", "Saved merged tracker to faces.dat")
+
+                    val outFile = File(context.filesDir, "faces.dat")
+                    mergedTrackerData?.callAttr("save_to_binary", outFile.absolutePath)
+                    _mergeLogs.value += "Saved merged tracker to faces.dat\n"
+                    Log.d("ChaquopyMerge", "Saved merged tracker to faces.dat")
+
+
 
                 // Debug: Save merged tracker as JSON for inspection to external storage
 //                val externalJsonOutFile = File(context.filesDir, "faces_merged.json")
@@ -565,6 +584,12 @@ class MainViewModel : ViewModel() {
             } catch (e: Exception) {
                 _mergeLogs.value += "Error: ${e.localizedMessage}\n"
                 onComplete(false, e.localizedMessage ?: "Unknown error")
+                Log.d("ChaquopyMerge", e.localizedMessage ?: "Unknown error")
+                val facesDatFile = File(context.filesDir, "faces.dat")
+                if (facesDatFile.exists()) {
+                    facesDatFile.writeBytes(byteArrayOf())
+                    Log.e("ChaquopyMerge", "faces.dat cleared before merging")
+                }
             }
         }
     }

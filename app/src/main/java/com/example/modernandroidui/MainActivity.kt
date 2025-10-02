@@ -274,11 +274,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.i("stoken_F", "FSDK Activating")
+
+        SessionManager.setAppContext(this)
         luxandTrackerManager = LuxandTrackerManager(applicationContext)
-        var luxandReady by mutableStateOf(false)
-        lifecycleScope.launch {
-            luxandReady = luxandTrackerManager?.initialize() == true
-        }
+//        var luxandReady by mutableStateOf(false)
+//        lifecycleScope.launch {
+//            luxandReady = luxandTrackerManager?.initialize() == true
+//        }
         setContent {
             val navController = rememberNavController()
             val appContext = applicationContext
@@ -418,24 +420,24 @@ class MainActivity : ComponentActivity() {
                             val appContext = LocalContext.current.applicationContext
                             val autoSyncTriggered = SyncSessionState.autoSyncTriggered
                             // Trigger sync automatically after login if not already done
-//                            LaunchedEffect(Unit) {
-//                                Log.d("SyncNowFull", "autoSyncTriggered ${autoSyncTriggered.value} issync ${SessionManager.isSyncDone(appContext)}")
-//                                if (!autoSyncTriggered.value ) {
-//                                    delay(300)
-//                                    //&& !SessionManager.isSyncDone(appContext)
-//                                    autoSyncTriggered.value = true
-//                                    mainViewModel.syncNowFull(
-//                                        context = appContext,
-//                                        token = SessionManager.getToken(appContext),
-//                                        luxandTrackerManager = luxandTrackerManager!!
-//                                    ) { success, message ->
-//                                        Toast.makeText(appContext, message, Toast.LENGTH_SHORT).show()
-//                                        if (success) {
-//                                            SessionManager.setSyncDone(appContext, true)
-//                                        }
-//                                    }
-//                                }
-//                            }
+                            LaunchedEffect(Unit) {
+                                Log.d("SyncNowFull", "autoSyncTriggered ${autoSyncTriggered.value} issync ${SessionManager.isSyncDone(appContext)}")
+                                if (!autoSyncTriggered.value ) {
+                                    delay(300)
+                                    //&& !SessionManager.isSyncDone(appContext)
+                                    autoSyncTriggered.value = true
+                                    mainViewModel.syncNowFull(
+                                        context = appContext,
+                                        token = SessionManager.getToken(appContext),
+                                        luxandTrackerManager = luxandTrackerManager!!
+                                    ) { success, message ->
+                                        Toast.makeText(appContext, message, Toast.LENGTH_SHORT).show()
+                                        if (success) {
+                                            SessionManager.setSyncDone(appContext, true)
+                                        }
+                                    }
+                                }
+                            }
                             MainMenuScreen(
                                 onAttendanceClick = { navController.navigate("attendance") },
                                 onEmployeeClick = {

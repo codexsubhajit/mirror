@@ -76,6 +76,8 @@ fun AttendanceScreen(
 ) {
 
     val context = LocalContext.current
+    // State to block attendance marking while sync is running
+    var isSyncing by remember { mutableStateOf(false) }
     val settingsDataStore = remember { SettingsDataStore(context) }
     val branchDataStore = remember { BranchDataStore(context) }
     // Internet connection state
@@ -88,7 +90,9 @@ fun AttendanceScreen(
 
     // If mirrorGeoFencing == 1 and geofencing is not enabled, block attendance and show message
     if (mirrorGeoFencing == 1 && !geofencingEnabledState) {
-        Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier
+            .fillMaxSize()
+            .padding(12.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("You are restricted to enable geofencing!\nPlease enable geo-fencing from the app's Settings page.", color = MaterialTheme.colorScheme.error)
                 Spacer(modifier = Modifier.height(16.dp))
@@ -270,7 +274,9 @@ fun AttendanceScreen(
     }
     // Only proceed if permissionStep == 3
     if (locationError != null) {
-        Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier
+            .fillMaxSize()
+            .padding(12.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(locationError!!)
                 Spacer(modifier = Modifier.height(16.dp))
@@ -440,7 +446,10 @@ fun AttendanceScreen(
         }
     ) { innerPadding ->
         // Removed sync button and progress/result UI for direct upload
-        Box(modifier = Modifier.fillMaxSize().padding(innerPadding).then(gestureModifier)) {
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+            .then(gestureModifier)) {
             AndroidView(
                 factory = { ctx ->
                     val previewView = androidx.camera.view.PreviewView(ctx)
@@ -617,115 +626,55 @@ fun AttendanceScreen(
 //            faceStatus = "no_face"
 //            return@LaunchedEffect
 //        }
-        if (matchedEmployee != null && faceStatus == "matched") {
-            val empId = matchedEmployee!!.employeeId
-            Log.i("AttendanceScreen","I am matching against $empId")
-            val lastAnimTime  = lastAnimationTimes[empId] ?: 0L
-            val windowMillis = 70_000L // 70 seconds (server-safe 1 min gap)
-            if (now - lastAnimTime >= windowMillis) {
-                animationText = "Marked attendance for ${matchedEmployee!!.name} at " + java.text.SimpleDateFormat("HH:mm:ss").format(java.util.Date(now))
-                showSuccessAnimation = true
-                lastAnimationTimes[empId] = now
-                sharedPrefs.edit().putLong("lastAnimTime_" + empId, now).apply()
-                blockedEmpId = null
-                blockedUntil = null
-                // Save face image to file for upload (no DB interaction)
-                var imageFile: java.io.File? = null
-                try {
-                    val fileName = "attendance_${empId}_${now}.jpg"
-                    val bitmap = previewBitmap
-                    if (bitmap != null) {
-                        val file = java.io.File(context.filesDir, fileName)
-                        val out = java.io.FileOutputStream(file)
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-                        out.flush()
-                        out.close()
-                        imageFile = file
-                        Log.d("AttendanceScreen", "Saved image at ${file.absolutePath}, size=${file.length()} bytes")
-                    }
-                } catch (e: Exception) {
-                    Log.e("AttendanceScreen", "Failed to save attendance image for upload: ${e.message}")
-                }
-
-                // Capture imageFile in a local val for the lambda
-                val capturedImageFile = imageFile
-                val uploadAndCallApi: suspend () -> Unit = {
-                    val localImageFile = capturedImageFile
-                    val uniqueFileName = localImageFile?.name
-                    if (localImageFile != null && uniqueFileName != null && localImageFile.exists()) {
-                        val url = kotlinx.coroutines.suspendCancellableCoroutine<String?> { cont ->
-                            com.example.modernandroidui.util.S3Uploader.uploadImage(context, localImageFile, uniqueFileName) { success, uploadedUrl ->
-                                cont.resume(uploadedUrl, null)
-                            }
-                        }
-                        if (url != null) {
-                            //AttendanceSyncUtil.uploadSingleAttendance(context, empId, now, url)
-                        } else {
-                            Log.e("AttendanceScreen", "Image upload failed or URL is null, skipping uploadSingleAttendance.")
-                        }
-                    } else {
-                        Log.e("AttendanceScreen", "No image file found for attendance upload, skipping uploadSingleAttendance.")
-                    }
-                }
-
-                // Play voice for attendance marked using raw resource
-                try {
-                    Log.d("AttendanceScreen", "Attempting to play attn_mark.mp3 for empId=$empId at $now")
-                    var localMediaPlayer: android.media.MediaPlayer? = null
-                    val mediaPlayer = android.media.MediaPlayer.create(context, com.example.modernandroidui.R.raw.attn_mark)
-                    localMediaPlayer = mediaPlayer
-                    if (mediaPlayer == null) {
-                        Log.e("AttendanceScreen", "MediaPlayer.create returned null!")
-                        throw Exception("MediaPlayer.create returned null")
-                    }
-                    mediaPlayer.setOnPreparedListener {
-                        Log.d("AttendanceScreen", "MediaPlayer prepared, duration=${mediaPlayer.duration}ms")
-                    }
-                    mediaPlayer.setOnCompletionListener { mp ->
-                        mp.release()
-                        localMediaPlayer = null
-                        showSuccessAnimation = false
-                        matchedEmployee = null
-                        faceStatus = "no_face"
-//                        coroutineScope.launch {
-//                            try {
-//                                uploadAndCallApi()
-//                            } catch (_: Exception) {}
-//                        }
-                    }
-                    mediaPlayer.setOnErrorListener { mp, _, _ ->
-                        mp.release()
-                        localMediaPlayer = null
-                        showSuccessAnimation = false
-                        matchedEmployee = null
-                        faceStatus = "no_face"
-//                        coroutineScope.launch {
-//                            try {
-//                                uploadAndCallApi()
-//                            } catch (_: Exception) {}
-//                        }
-                        true
-                    }
-                    mediaPlayer.start()
-                } catch (e: Exception) {
-                    Log.e("AttendanceScreen", "Failed to play attn_mark.mp3: ${e.message}")
-//                    kotlinx.coroutines.GlobalScope.launch {
-//                        kotlinx.coroutines.delay(3000)
-//                        showSuccessAnimation = false
-//                        matchedEmployee = null
-//                        faceStatus = "no_face"
-//                        try {
-//                            uploadAndCallApi()
-//                        } catch (_: Exception) {}
+    if (isSyncing) return@LaunchedEffect
+//    if (matchedEmployee != null && faceStatus == "matched") {
+//            val empId = matchedEmployee!!.employeeId
+//            Log.i("AttendanceScreen","I am matching against $empId")
+//            val lastAnimTime  = lastAnimationTimes[empId] ?: 0L
+//            val windowMillis = 70_000L // 70 seconds (server-safe 1 min gap)
+//            if (now - lastAnimTime >= windowMillis) {
+//                animationText = "Marked attendance for ${matchedEmployee!!.name} at " + java.text.SimpleDateFormat("HH:mm:ss").format(java.util.Date(now))
+//                showSuccessAnimation = true
+//                lastAnimationTimes[empId] = now
+//                sharedPrefs.edit().putLong("lastAnimTime_" + empId, now).apply()
+//                blockedEmpId = null
+//                blockedUntil = null
+//                // Save face image to file for upload (no DB interaction)
+//                var imageFile: java.io.File? = null
+//                try {
+//                    val fileName = "attendance_${empId}_${now}.jpg"
+//                    val bitmap = previewBitmap
+//                    if (bitmap != null) {
+//                        val file = java.io.File(context.filesDir, fileName)
+//                        val out = java.io.FileOutputStream(file)
+//                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+//                        out.flush()
+//                        out.close()
+//                        imageFile = file
+//                        Log.d("AttendanceScreen", "Saved image at ${file.absolutePath}, size=${file.length()} bytes")
 //                    }
-                }
-            } else {
-                blockedEmpId = empId
-                blockedUntil = lastAnimTime + windowMillis
-                matchedEmployee = null
-                faceStatus = "no_face"
-            }
-        }
+//                } catch (e: Exception) {
+//                    Log.e("AttendanceScreen", "Failed to save attendance image for upload: ${e.message}")
+//                }
+//
+//                // Play voice for attendance marked using raw resource
+//                try {
+//                    Log.d("AttendanceScreen", "Attempting to play attn_mark.mp3 for empId=$empId at $now")
+//                    var localMediaPlayer: android.media.MediaPlayer? = null
+//                    val mediaPlayer = android.media.MediaPlayer.create(context, com.example.modernandroidui.R.raw.attn_mark)
+//                    localMediaPlayer = mediaPlayer
+//
+//                    mediaPlayer.start()
+//                } catch (e: Exception) {
+//                    Log.e("AttendanceScreen", "Failed to play attn_mark.mp3: ${e.message}")
+//                }
+//            } else {
+//                blockedEmpId = empId
+//                blockedUntil = lastAnimTime + windowMillis
+//                matchedEmployee = null
+//                faceStatus = "no_face"
+//            }
+//        }
     }
 
     LaunchedEffect(lensFacing, hasCameraPermission) {
@@ -793,15 +742,19 @@ fun AttendanceScreen(
                         faceRect = null
                         faceStatus = "no_face"
                         matchedEmployee = null
+                        blockedEmpId = null
+                        blockedUntil = null
                     } else {
                         // Block new matches while animation/sound is running
                         if (showSuccessAnimation) return@launch
                         val face = faces[0]
                         faceRect = face.rect
+
                         if (com.example.modernandroidui.session.SessionManager.lightCondition == 1) {
                             val emp = empList.find { it.id.trim() == face.name.trim() }
                             Log.d("AttendanceScreen", "Comparing face.name='${face.name.trim()}' to DB IDs...")
-                            if (emp != null && emp.faceRegistered) {
+
+                            if (!isSyncing && emp != null && emp.faceRegistered) {
                                 faceStatus = "matched"
                                 matchedEmployee = FaceMapEntity(
                                     faceId = face.id,
@@ -810,12 +763,37 @@ fun AttendanceScreen(
                                     mobile = emp.mobile,
                                     branch = emp.branch
                                 )
-                                // Attendance log logic with rolling window duplicate prevention
+
                                 val now = System.currentTimeMillis()
+                                val lastAnimTime = lastAnimationTimes[emp.id] ?: 0L
                                 val windowMillis = 70_000L // 70 seconds (server-safe 1 min gap)
-                                val logs = attendanceLogDao.getLogsForEmployeeWithinWindow(emp.id, now - windowMillis)
-                                val shouldLog = logs.isEmpty()
-                                if (shouldLog) {
+                                val cooldownActive = (System.currentTimeMillis() - lastAnimTime) < windowMillis
+                                if (!cooldownActive) {
+
+                                    animationText = "Marked attendance for ${matchedEmployee!!.name} at " + java.text.SimpleDateFormat("HH:mm:ss").format(java.util.Date(now))
+                                    showSuccessAnimation = true
+                                    lastAnimationTimes[emp.id] = now
+                                    sharedPrefs.edit().putLong("lastAnimTime_" + emp.id, now).apply()
+
+
+                                    // Play voice for attendance marked using raw resource
+                                    try {
+                                        Log.d("AttendanceScreen", "Attempting to play attn_mark.mp3 for empId=${emp.id} at $now")
+                                        var localMediaPlayer: android.media.MediaPlayer? = null
+                                        val mediaPlayer = android.media.MediaPlayer.create(context, com.example.modernandroidui.R.raw.attn_mark)
+                                        localMediaPlayer = mediaPlayer
+
+                                        mediaPlayer.start()
+                                    } catch (e: Exception) {
+                                        Log.e("AttendanceScreen", "Failed to play attn_mark.mp3: ${e.message}")
+                                    }
+
+                                // Attendance log logic with rolling window duplicate prevention
+//                                val now = System.currentTimeMillis()
+//                                val windowMillis = 70_000L // 70 seconds (server-safe 1 min gap)
+//                                val logs = attendanceLogDao.getLogsForEmployeeWithinWindow(emp.id, now - windowMillis)
+//                                val shouldLog = logs.isEmpty()
+//                                if (shouldLog) {
                                     // Save face image to file
                                     val bitmap = imageProxy.toBitmap()
                                     val rect = face.rect
@@ -838,7 +816,6 @@ fun AttendanceScreen(
                                         } catch (e: Exception) { null }
                                     } else null
                                     var imagePath = ""
-                                    //var imageFile= ""
                                     if (cropped != null) {
                                         try {
                                             val fileName = "attendance_${emp.id}_${now}.jpg"
@@ -848,32 +825,47 @@ fun AttendanceScreen(
                                             out.flush()
                                             out.close()
                                             imagePath = file.absolutePath
-                                            //imageFile = file
                                             Log.d("AttendanceScreen", "Saved image at $imagePath, size=${file.length()} bytes")
                                         } catch (e: Exception) {
                                             Log.e("AttendanceScreen", "Failed to save attendance image: "+e.message)
                                         }
                                     }
-                                    val now = System.currentTimeMillis()
-                                    val lastAnimTime = lastAnimationTimes[emp.id] ?: 0L
-                                    val windowMillis = 70_000L // 70 seconds (server-safe 1 min gap)
-                                    val cooldownActive = (System.currentTimeMillis() - lastAnimTime) < windowMillis
-                                    if (isConnected && !cooldownActive) {
-                                        // Upload directly, do not insert into DB
-                                        AttendanceSyncUtil.uploadSingleAttendance(context, emp.id, now, imagePath)
 
-//
-                                    } else if (!isConnected && !cooldownActive) {
                                         // No internet, insert into DB for later sync
+
+
                                         val log = com.example.modernandroidui.data.AttendanceLogEntity(
                                             empId = emp.id,
                                             attendanceDatetime = now,
                                             mirrorImagePath = imagePath
                                         )
-                                        attendanceLogDao.insert(log)
-                                        Log.d("AttendanceScreen", "Attendance log inserted for ${emp.id} at $now, image: $imagePath (offline mode)")
+                                        withContext(Dispatchers.IO) {
+                                            attendanceLogDao.insert(log)
+                                        }
+                                        Log.d(
+                                            "AttendanceScreen",
+                                            "Attendance log inserted for ${emp.id} at $now, image: $imagePath (offline mode)"
+                                        )
+                                        kotlinx.coroutines.delay(200) // Small delay to ensure DB write
+                                        isSyncing = false
+                                        com.example.modernandroidui.util.AttendanceSyncUtil.uploadAllLogsAndGetUrls(
+                                            context
+                                        )
+
+//                                        try {
+//
+//                                        } finally {
+//                                            isSyncing = false
+//                                        }
                                     }
+                                else{
+                                    Log.d("AttendanceScreen", "blocked for: ${emp.id}")
+
+                                    blockedEmpId = emp.id
+                                    blockedUntil = now + windowMillis
+                                    faceStatus = "no_face"
                                 }
+                                //}
                             } else {
                                 faceStatus = "not_matched"
                                 matchedEmployee = null
