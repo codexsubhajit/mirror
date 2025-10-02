@@ -1,4 +1,4 @@
-# Modern Android UI
+# Mirror
 
 This project is a modern Android application built using Kotlin and Jetpack Compose, following Material Design 3 principles. It demonstrates the use of responsive layouts, accessibility best practices, and the MVVM architecture.
 
