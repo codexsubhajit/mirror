@@ -32,12 +32,13 @@ import com.example.modernandroidui.viewmodel.LoginViewModel
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
+    onPinRequired: () -> Unit,
     viewModel: LoginViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
-
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
     val otpFocusRequester = remember { FocusRequester() }
+    val pinFocusRequester = remember { FocusRequester() }
     val context = androidx.compose.ui.platform.LocalContext.current
     val hasInternet = com.example.modernandroidui.util.NetworkUtil.isInternetAvailable(context)
 
@@ -119,7 +120,7 @@ fun LoginScreen(
                             }
                         )
                         AnimatedVisibility(
-                            visible = uiState.otpSent,
+                            visible = uiState.otpSent && !uiState.showPinField,
                             enter = fadeIn() + expandVertically(),
                             exit = fadeOut() + shrinkVertically()
                         ) {
@@ -150,16 +151,48 @@ fun LoginScreen(
                                 }
                             )
                         }
+                        AnimatedVisibility(
+                            visible = uiState.showPinField,
+                            enter = fadeIn() + expandVertically(),
+                            exit = fadeOut() + shrinkVertically()
+                        ) {
+                            Spacer(Modifier.height(16.dp))
+                            OutlinedTextField(
+                                value = uiState.pin,
+                                onValueChange = { viewModel.onPinChanged(it) },
+                                label = { Text("PIN") },
+                                placeholder = { Text("Enter 4-digit PIN") },
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.NumberPassword,
+                                    imeAction = ImeAction.Done
+                                ),
+                                singleLine = true,
+                                isError = uiState.pinError != null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .focusRequester(pinFocusRequester),
+                                visualTransformation = PasswordVisualTransformation(),
+                                supportingText = {
+                                    uiState.pinError?.let {
+                                        Text(
+                                            text = stringResource(it),
+                                            color = MaterialTheme.colorScheme.error,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                            )
+                        }
                         Spacer(Modifier.height(24.dp))
                         AnimatedContent(
-                            targetState = uiState.otpSent,
+                            targetState = if (uiState.showPinField) "pin" else if (uiState.otpSent) "otp" else "send",
                             transitionSpec = { fadeIn() with fadeOut() }
-                        ) { otpSent ->
-                            if (!otpSent) {
-                                Button(
+                        ) { state ->
+                            when (state) {
+                                "send" -> Button(
                                     onClick = {
                                         focusManager.clearFocus()
-                                        viewModel.sendOtp(context)
+                                        viewModel.sendOtp(context, onPinRequired)
                                     },
                                     enabled = !uiState.loading,
                                     modifier = Modifier.fillMaxWidth()
@@ -174,8 +207,7 @@ fun LoginScreen(
                                         Text(stringResource(R.string.send_otp))
                                     }
                                 }
-                            } else {
-                                Button(
+                                "otp" -> Button(
                                     onClick = {
                                         focusManager.clearFocus()
                                         viewModel.verifyOtp()
@@ -191,6 +223,24 @@ fun LoginScreen(
                                         )
                                     } else {
                                         Text(stringResource(R.string.verify_otp))
+                                    }
+                                }
+                                "pin" -> Button(
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        viewModel.verifyPin(context)
+                                    },
+                                    enabled = !uiState.loading,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    if (uiState.loading) {
+                                        CircularProgressIndicator(
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.size(20.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                    } else {
+                                        Text("Verify PIN")
                                     }
                                 }
                             }

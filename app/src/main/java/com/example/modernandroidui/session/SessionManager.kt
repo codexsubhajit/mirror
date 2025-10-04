@@ -5,6 +5,7 @@ import android.content.Context
 object SessionManager {
     private const val EMPLOYER_ID_KEY = "employer_id"
     private const val KEY_SYNC_DONE = "sync_done"
+    private const val KEY_PHONE_NUMBER = "phone_number"
 
     @Volatile
     private var appContext: Context? = null
@@ -75,5 +76,15 @@ object SessionManager {
         val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
         val id = prefs.getInt(KEY_USER_ID, -1)
         return if (id == -1) null else id
+    }
+
+    fun savePhoneNumber(context: Context, phone: String) {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_PHONE_NUMBER, phone).apply()
+    }
+
+    fun getPhoneNumber(context: Context): String? {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_PHONE_NUMBER, null)
     }
 }

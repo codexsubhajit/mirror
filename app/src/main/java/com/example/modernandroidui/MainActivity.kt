@@ -154,10 +154,10 @@ class MainActivity : ComponentActivity() {
         @JvmStatic
         suspend fun verifyPinApi(context: android.content.Context, pin: String): Pair<Boolean, String> {
             val token = com.example.modernandroidui.session.SessionManager.getToken(context)
-            return verifyPinApiInternal(token, pin)
+            return verifyPinApiInternal(context, token, pin)
         }
 
-        private suspend fun verifyPinApiInternal(token: String?, pin: String): Pair<Boolean, String> {
+        private suspend fun verifyPinApiInternal(context: android.content.Context, token: String?, pin: String): Pair<Boolean, String> {
             Log.d("PIN_API", "verifyPinApi called with token: $token, pin: $pin")
             if (token.isNullOrBlank()) {
                 Log.e("PIN_API", "No token found")
@@ -179,7 +179,7 @@ class MainActivity : ComponentActivity() {
             }
             return try {
                 kotlinx.coroutines.withContext(Dispatchers.IO) {
-                    val url = java.net.URL("https://web.nithrapeople.com/v1/api/checkpin")
+                    val url = java.net.URL("https://app.nithrapeople.com/api/login-pin")
                     Log.d("PIN_API", "URL created")
                     val conn = url.openConnection() as java.net.HttpURLConnection
                     Log.d("PIN_API", "Connection opened")
@@ -189,6 +189,8 @@ class MainActivity : ComponentActivity() {
                     conn.doOutput = true
                     val jsonBody = org.json.JSONObject()
                     jsonBody.put("pin", pin)
+                    val phoneNumber = com.example.modernandroidui.session.SessionManager.getPhoneNumber(context)
+                    jsonBody.put("phone_number", phoneNumber ?: "")
                     val bodyString = jsonBody.toString()
                     Log.d("PIN_API", "Request body: $bodyString")
                     conn.outputStream.use { it.write(bodyString.toByteArray()) }
@@ -568,6 +570,10 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate("mainMenu") {
                                         popUpTo("login") { inclusive = true }
                                     }
+                                },
+                                onPinRequired = {
+                                    Log.d("MainActivity", "showPinDialog set to true from onPinRequired callback")
+                                    showPinDialog = true
                                 },
                                 viewModel = loginViewModel
                             )

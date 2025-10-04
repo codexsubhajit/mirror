@@ -37,17 +37,20 @@ import java.io.InputStreamReader
 data class LoginUiState(
     val phone: String = "",
     val otp: String = "",
+    val pin: String = "",
     val otpSent: Boolean = false,
     val loading: Boolean = false,
     val loginSuccess: Boolean = false,
     val phoneError: Int? = null,
     val otpError: Int? = null,
+    val pinError: Int? = null,
     val generalError: Int? = null,
     val userId: Int? = null,
     val employerId: Int? = null,
     val otpServer: String? = null,
     val token: String? = null,
-    val loginMessage: String? = null
+    val loginMessage: String? = null,
+    val showPinField: Boolean = false
 )
 
 class LoginViewModel : ViewModel() {
@@ -70,7 +73,15 @@ class LoginViewModel : ViewModel() {
         )
     }
 
-    fun sendOtp(context: Context) {
+    fun onPinChanged(pin: String) {
+        _uiState.value = _uiState.value.copy(
+            pin = pin.filter { it.isDigit() },
+            pinError = null,
+            generalError = null
+        )
+    }
+
+    fun sendOtp(context: Context, onPinRequired: (() -> Unit)? = null) {
         val phone = _uiState.value.phone
         if (phone.length != 10) {
             _uiState.value = _uiState.value.copy(phoneError = R.string.error_invalid_phone)
@@ -80,15 +91,15 @@ class LoginViewModel : ViewModel() {
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
                 try {
-                    val url = URL("https://web.nithrapeople.com/v1/api/user-login")
+                    val url = URL("https://app.nithrapeople.com/api/login")
                     val conn = url.openConnection() as HttpURLConnection
                     conn.requestMethod = "POST"
                     conn.setRequestProperty("Content-Type", "application/json")
                     conn.doOutput = true
                     val jsonBody = JSONObject()
-                    jsonBody.put("phone", phone)
-                    jsonBody.put("login_type", 1)
-                    jsonBody.put("is_mirror", true)
+                    jsonBody.put("phone_number", phone)
+                    com.example.modernandroidui.session.SessionManager.savePhoneNumber(context, phone)
+                    jsonBody.put("is_mirror", false)
                     conn.outputStream.use { it.write(jsonBody.toString().toByteArray()) }
                     val response = if (conn.responseCode in 200..299) {
                         conn.inputStream.bufferedReader().readText()
@@ -110,6 +121,12 @@ class LoginViewModel : ViewModel() {
                 if (data != null && data.has("employer_id")) {
                     SessionManager.saveEmployerId(context, data.optInt("employer_id"))
                 }
+                val isverified = data?.optBoolean("verified") ?: false
+                if (isverified) {
+                    // If verified, show PIN page
+                    _uiState.value = _uiState.value.copy(loading = false, loginMessage = result.optString("message"), showPinField = true)
+                    return@launch
+                }
                 _uiState.value = _uiState.value.copy(
                     otpSent = true,
                     loading = false,
@@ -118,14 +135,15 @@ class LoginViewModel : ViewModel() {
                     userId = data?.optInt("userId"),
                     employerId = data?.optInt("employer_id"),
                     otpServer = data?.optString("otp"),
-                    loginMessage = result.optString("message")
+                    loginMessage = result.optString("message"),
+                    showPinField = false
                 )
-
             } else {
                 _uiState.value = _uiState.value.copy(
                     loading = false,
                     generalError = null,
-                    loginMessage = result.optString("message").ifBlank { "Invalid phone number or user not found." }
+                    loginMessage = result.optString("message").ifBlank { "Invalid phone number or user not found." },
+                    showPinField = false
                 )
             }
         }
@@ -146,7 +164,7 @@ class LoginViewModel : ViewModel() {
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
                 try {
-                    val url = URL("https://web.nithrapeople.com/v1/api/verifyOtp")
+                    val url = URL("https://app.nithrapeople.com/api/verify-otp")
                     val conn = url.openConnection() as HttpURLConnection
                     conn.requestMethod = "POST"
                     conn.setRequestProperty("Content-Type", "application/json")
@@ -184,6 +202,62 @@ class LoginViewModel : ViewModel() {
                     loading = false,
                     loginSuccess = false,
                     loginMessage = errorMsg
+                )
+            }
+        }
+    }
+
+    fun verifyPin(context: Context) {
+        val pin = _uiState.value.pin
+        val phone = _uiState.value.phone
+        if (pin.isBlank()) {
+            _uiState.value = _uiState.value.copy(pinError = R.string.error_invalid_pin)
+            return
+        }
+        _uiState.value = _uiState.value.copy(loading = true, generalError = null, loginMessage = null)
+        viewModelScope.launch {
+            val (success, message, token, userId) = withContext(Dispatchers.IO) {
+                try {
+                    val url = URL("https://app.nithrapeople.com/api/login-pin")
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.requestMethod = "POST"
+                    conn.setRequestProperty("Content-Type", "application/json")
+                    conn.doOutput = true
+                    val jsonBody = JSONObject()
+                    jsonBody.put("phone_number", phone)
+                    jsonBody.put("pin", pin)
+                    conn.outputStream.use { it.write(jsonBody.toString().toByteArray()) }
+                    val response = if (conn.responseCode in 200..299) {
+                        conn.inputStream.bufferedReader().readText()
+                    } else {
+                        conn.errorStream?.bufferedReader()?.readText() ?: "{}"
+                    }
+                    val json = JSONObject(response)
+                    val success = json.optBoolean("success", false)
+                    val message = json.optString("message", "")
+                    val data = json.optJSONObject("data")
+                    val token = data?.optString("token")
+                    val userId = data?.optInt("user_id")
+                    Quadruple(success, message, token, userId)
+                } catch (e: Exception) {
+                    Quadruple(false, e.localizedMessage ?: "Unknown error", null, null)
+                }
+            }
+            if (success && token != null && userId != null) {
+                SessionManager.saveSession(context, token, userId)
+                _uiState.value = _uiState.value.copy(
+                    loading = false,
+                    loginSuccess = true,
+                    loginMessage = message,
+                    pin = "",
+                    token = token
+                )
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    loading = false,
+                    loginSuccess = false,
+                    pinError = null,
+                    loginMessage = message.ifBlank { "Invalid PIN. Please try again." }
                 )
             }
         }
@@ -314,7 +388,7 @@ class MainViewModel : ViewModel() {
                         val employeeDao = db.employeeDao()
                         val faceMapDao = db.faceMapDao()
                         val countUrl =
-                            URL("https://web.nithrapeople.com/v1/api/mirrorjsondatacount")
+                            URL("https://app.nithrapeople.com/api/mirrorjsondatacount")
                         val countConn = countUrl.openConnection() as HttpURLConnection
                         countConn.requestMethod = "GET"
                         countConn.setRequestProperty("Authorization", "Bearer $token")
@@ -327,7 +401,7 @@ class MainViewModel : ViewModel() {
                         while (offset < totalCount) {
                             Log.e("ChaquopyMerge", "getsyncemployees offset $offset")
                             val syncUrl =
-                                URL("https://web.nithrapeople.com/v1/api/getsyncemployees")
+                                URL("https://app.nithrapeople.com/api/getsyncemployees")
                             val syncConn = syncUrl.openConnection() as HttpURLConnection
                             syncConn.requestMethod = "POST"
                             syncConn.setRequestProperty("Authorization", "Bearer $token")
@@ -339,8 +413,11 @@ class MainViewModel : ViewModel() {
                             syncConn.outputStream.use { it.write(body.toString().toByteArray()) }
                             val syncResponse = syncConn.inputStream.bufferedReader().readText()
                             val syncJson = JSONObject(syncResponse)
-                            val employeeList =
-                                syncJson.optJSONObject("data")?.optJSONArray("employee_list")
+                            //val employeeList =
+                            //    syncJson.optJSONObject("data")?.optJSONArray("employee_list")
+                            val employeeList = syncJson.optJSONArray("data")
+                            Log.i("mainViewModel EMP list", employeeList as String)
+
                             var fetched = 0
                             if (employeeList != null) {
                                 for (i in 0 until employeeList.length()) {
@@ -594,3 +671,5 @@ class MainViewModel : ViewModel() {
         }
     }
 }
+
+data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)

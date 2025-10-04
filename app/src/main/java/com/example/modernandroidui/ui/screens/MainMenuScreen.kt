@@ -224,7 +224,7 @@ fun MainMenuScreen(
                         OutlinedTextField(
                             value = pinInput,
                             onValueChange = {
-                                if (it.length <= 4 && it.all { c -> c.isDigit() }) {
+                                if (it.all { c -> c.isDigit() }) {
                                     pinInput = it
                                     pinError = null
                                 }
@@ -251,10 +251,10 @@ fun MainMenuScreen(
                 },
                 confirmButton = {
                     TextButton(onClick = {
-                        if (pinInput.length != 4) {
-                            pinError = "PIN must be 4 digits."
-                            return@TextButton
-                        }
+//                        if (pinInput.length != 4) {
+//                            pinError = "PIN must be 4 digits."
+//                            return@TextButton
+//                        }
                         pinVerifying = true
                         pinError = null
                         // Use API for PIN check
