@@ -38,6 +38,8 @@ data class LoginUiState(
     val phone: String = "",
     val otp: String = "",
     val pin: String = "",
+        val rePin: String = "",
+        val rePinError: Int? = null,
     val otpSent: Boolean = false,
     val loading: Boolean = false,
     val loginSuccess: Boolean = false,
@@ -54,6 +56,55 @@ data class LoginUiState(
 )
 
 class LoginViewModel : ViewModel() {
+    fun resetPin(context: Context) {
+        val phone = _uiState.value.phone
+        if (phone.length != 10) {
+            _uiState.value = _uiState.value.copy(phoneError = R.string.error_invalid_phone)
+            return
+        }
+        _uiState.value = _uiState.value.copy(loading = true, generalError = null, loginMessage = null)
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    val url = URL("https://app.nithrapeople.com/api/reset-pin")
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.requestMethod = "POST"
+                    conn.setRequestProperty("Content-Type", "application/json")
+                    conn.doOutput = true
+                    val jsonBody = JSONObject()
+                    jsonBody.put("phone_number", phone)
+                    conn.outputStream.use { it.write(jsonBody.toString().toByteArray()) }
+                    val response = if (conn.responseCode in 200..299) {
+                        conn.inputStream.bufferedReader().readText()
+                    } else {
+                        conn.errorStream?.bufferedReader()?.readText() ?: ""
+                    }
+                    val json = JSONObject(response)
+                    json
+                } catch (e: Exception) {
+                    JSONObject().apply {
+                        put("success", false)
+                        put("message", e.localizedMessage ?: "Network error")
+                    }
+                }
+            }
+            val msg = result.optString("message", "Reset PIN request sent.")
+            val success = result.optBoolean("success", false)
+            _uiState.value = _uiState.value.copy(
+                loading = false,
+                loginMessage = msg,
+                otpSent = success,
+                showPinField = false
+            )
+        }
+    }
+    fun onRePinChanged(rePin: String) {
+        _uiState.value = _uiState.value.copy(
+            rePin = rePin.filter { it.isDigit() },
+            rePinError = null,
+            generalError = null
+        )
+    }
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState
 
@@ -149,15 +200,25 @@ class LoginViewModel : ViewModel() {
         }
     }
 
-    fun verifyOtp() {
+    fun verifyOtp(context: Context) {
+        val phone = _uiState.value.phone
         val otp = _uiState.value.otp
-        val userId = _uiState.value.userId
+        val pin = _uiState.value.pin
+        val rePin = _uiState.value.rePin
+        if (phone.length != 10) {
+            _uiState.value = _uiState.value.copy(phoneError = R.string.error_invalid_phone)
+            return
+        }
         if (otp.length != 6) {
             _uiState.value = _uiState.value.copy(otpError = R.string.error_invalid_otp)
             return
         }
-        if (userId == null) {
-            _uiState.value = _uiState.value.copy(generalError = R.string.error_invalid_phone)
+        if (pin.length != 6) {
+            _uiState.value = _uiState.value.copy(pinError = R.string.error_invalid_pin)
+            return
+        }
+        if (rePin.length != 6 || pin != rePin) {
+            _uiState.value = _uiState.value.copy(rePinError = R.string.error_invalid_pin)
             return
         }
         _uiState.value = _uiState.value.copy(loading = true, generalError = null, loginMessage = null)
@@ -170,10 +231,16 @@ class LoginViewModel : ViewModel() {
                     conn.setRequestProperty("Content-Type", "application/json")
                     conn.doOutput = true
                     val jsonBody = JSONObject()
-                    jsonBody.put("userId", userId)
+                    com.example.modernandroidui.session.SessionManager.savePhoneNumber(context, phone)
+                    jsonBody.put("phone_number", phone)
                     jsonBody.put("otp", otp)
+                    jsonBody.put("pin", pin)
                     conn.outputStream.use { it.write(jsonBody.toString().toByteArray()) }
-                    val response = conn.inputStream.bufferedReader().readText()
+                    val response = if (conn.responseCode in 200..299) {
+                        conn.inputStream.bufferedReader().readText()
+                    } else {
+                        conn.errorStream?.bufferedReader()?.readText() ?: ""
+                    }
                     val json = JSONObject(response)
                     json
                 } catch (e: Exception) {
@@ -185,15 +252,18 @@ class LoginViewModel : ViewModel() {
             }
             if (result.optBoolean("success")) {
                 val data = result.optJSONObject("data")
+                val token = data?.optString("token")
+                val userId = data?.optInt("user_id")
+                com.example.modernandroidui.session.SessionManager.saveSession(context, token, userId)
+
                 _uiState.value = _uiState.value.copy(
                     loading = false,
                     loginSuccess = true,
-                    token = data?.optString("token"),
-                    employerId = data?.optInt("employer_id"),
+                    token = token,
+                    employerId = userId,
                     loginMessage = result.optString("message")
                 )
             } else {
-                // Patch: Show a meaningful error message if API message is blank or looks like a URL
                 var errorMsg = result.optString("message")
                 if (errorMsg.isBlank() || errorMsg.startsWith("http")) {
                     errorMsg = "Invalid OTP or server error. Please try again."
@@ -244,7 +314,8 @@ class LoginViewModel : ViewModel() {
                 }
             }
             if (success && token != null && userId != null) {
-                SessionManager.saveSession(context, token, userId)
+                // Save token and userId to session
+                com.example.modernandroidui.session.SessionManager.saveSession(context, token, userId)
                 _uiState.value = _uiState.value.copy(
                     loading = false,
                     loginSuccess = true,

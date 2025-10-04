@@ -20,5 +20,5 @@
     <string name="menu_employee">Employees</string>
     <string name="menu_settings">Settings</string>
     <string name="menu_logout">Logout</string>
-    <string name="error_invalid_pin">PIN must be 4 digits</string>
+    <string name="error_invalid_pin">PIN must be 6 digits</string>
 </resources>

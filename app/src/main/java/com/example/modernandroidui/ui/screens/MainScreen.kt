@@ -124,32 +124,85 @@ fun LoginScreen(
                             enter = fadeIn() + expandVertically(),
                             exit = fadeOut() + shrinkVertically()
                         ) {
-                            Spacer(Modifier.height(16.dp))
-                            OutlinedTextField(
-                                value = uiState.otp,
-                                onValueChange = { viewModel.onOtpChanged(it) },
-                                label = { Text(stringResource(R.string.otp_label)) },
-                                placeholder = { Text(stringResource(R.string.otp_placeholder)) },
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.NumberPassword,
-                                    imeAction = ImeAction.Done
-                                ),
-                                singleLine = true,
-                                isError = uiState.otpError != null,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .focusRequester(otpFocusRequester),
-                                visualTransformation = PasswordVisualTransformation(),
-                                supportingText = {
-                                    uiState.otpError?.let {
-                                        Text(
-                                            text = stringResource(it),
-                                            color = MaterialTheme.colorScheme.error,
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Spacer(Modifier.height(16.dp))
+                                OutlinedTextField(
+                                    value = uiState.otp,
+                                    onValueChange = { viewModel.onOtpChanged(it) },
+                                    label = { Text(stringResource(R.string.otp_label)) },
+                                    placeholder = { Text(stringResource(R.string.otp_placeholder)) },
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.NumberPassword,
+                                        imeAction = ImeAction.Done
+                                    ),
+                                    singleLine = true,
+                                    isError = uiState.otpError != null,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .focusRequester(otpFocusRequester),
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    supportingText = {
+                                        uiState.otpError?.let {
+                                            Text(
+                                                text = stringResource(it),
+                                                color = MaterialTheme.colorScheme.error,
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
                                     }
-                                }
-                            )
+                                )
+                                Spacer(Modifier.height(16.dp))
+                                OutlinedTextField(
+                                    value = uiState.pin,
+                                    onValueChange = { viewModel.onPinChanged(it) },
+                                    label = { Text("PIN") },
+                                    placeholder = { Text("Enter 4-digit PIN") },
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.NumberPassword,
+                                        imeAction = ImeAction.Next
+                                    ),
+                                    singleLine = true,
+                                    isError = uiState.pinError != null,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    supportingText = {
+                                        uiState.pinError?.let {
+                                            Text(
+                                                text = stringResource(it),
+                                                color = MaterialTheme.colorScheme.error,
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                    }
+                                )
+                                Spacer(Modifier.height(16.dp))
+                                OutlinedTextField(
+                                    value = uiState.rePin,
+                                    onValueChange = { viewModel.onRePinChanged(it) },
+                                    label = { Text("Re-enter PIN") },
+                                    placeholder = { Text("Re-enter 4-digit PIN") },
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.NumberPassword,
+                                        imeAction = ImeAction.Done
+                                    ),
+                                    singleLine = true,
+                                    isError = uiState.rePinError != null,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    supportingText = {
+                                        uiState.rePinError?.let {
+                                            Text(
+                                                text = stringResource(it),
+                                                color = MaterialTheme.colorScheme.error,
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                    }
+                                )
+                            }
                         }
                         AnimatedVisibility(
                             visible = uiState.showPinField,
@@ -189,28 +242,42 @@ fun LoginScreen(
                             transitionSpec = { fadeIn() with fadeOut() }
                         ) { state ->
                             when (state) {
-                                "send" -> Button(
-                                    onClick = {
-                                        focusManager.clearFocus()
-                                        viewModel.sendOtp(context, onPinRequired)
-                                    },
-                                    enabled = !uiState.loading,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    if (uiState.loading) {
-                                        CircularProgressIndicator(
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                            modifier = Modifier.size(20.dp),
-                                            strokeWidth = 2.dp
-                                        )
-                                    } else {
-                                        Text(stringResource(R.string.send_otp))
+                                "send" -> Column(modifier = Modifier.fillMaxWidth()) {
+                                    Button(
+                                        onClick = {
+                                            focusManager.clearFocus()
+                                            viewModel.sendOtp(context, onPinRequired)
+                                        },
+                                        enabled = !uiState.loading,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        if (uiState.loading) {
+                                            CircularProgressIndicator(
+                                                color = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier.size(20.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                        } else {
+                                            Text(stringResource(R.string.send_otp))
+                                        }
+                                    }
+                                    Spacer(Modifier.height(12.dp))
+                                    Button(
+                                        onClick = {
+                                            focusManager.clearFocus()
+                                            viewModel.resetPin(context)
+                                        },
+                                        enabled = !uiState.loading,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                                    ) {
+                                        Text("Reset PIN")
                                     }
                                 }
                                 "otp" -> Button(
                                     onClick = {
                                         focusManager.clearFocus()
-                                        viewModel.verifyOtp()
+                                        viewModel.verifyOtp(context)
                                     },
                                     enabled = !uiState.loading,
                                     modifier = Modifier.fillMaxWidth()
