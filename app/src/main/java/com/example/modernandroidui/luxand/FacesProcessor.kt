@@ -561,7 +561,9 @@ object FacesProcessor {
         var tilt: Float? = null
         var roll: Float? = null
         val resultLiveness = arrayOf("")
+        val resultConfidence = arrayOf("")
         var livenessScore2: Float? = null
+        var ConfidenceScore: Float? = null
         val imageBit = imageProxy.toBitmap()
         var eyesMissing = false
         var eyesTooClose = false
@@ -623,8 +625,30 @@ object FacesProcessor {
                                     resultLiveness,
                                     1024
                                 );
+
+                                FSDK.DetectFacialAttributeUsingFeatures(
+                                    image,
+                                    feature,
+                                    "Confidence",
+                                    resultConfidence,
+                                    1024
+                                )
+                                FSDK.GetTrackerFacialAttribute(
+                                    tracker,
+                                    0,
+                                    ids[0],
+                                    "Confidence",
+                                    resultConfidence,
+                                    1024
+                                );
                                 Log.i("acceptV3", "Liveness ${resultLiveness[0]}")
+                                Log.i("acceptV3", "Confidence ${resultConfidence[0]}")
                                 livenessScore2 = resultLiveness[0].split("Liveness=")[1].toFloatOrNull()
+
+
+                                ConfidenceScore = resultLiveness[0].split("Liveness=")[1].toFloatOrNull()
+
+
                                 Log.i("acceptV3", "livenessScore2 $livenessScore2")
                                 for (pair in resultImg[0].split(";")) {
                                     val values = pair.split("=")
@@ -693,18 +717,25 @@ object FacesProcessor {
 //                    }
                     val faceStrictEnabled = FaceStrictPrefs.get(SessionManager.getAppContext())
 
-                    if (faceStrictEnabled && livenessScore2 != null && livenessScore2 < 0.6f) {
+                    if (faceStrictEnabled && livenessScore2  != null && livenessScore2 < 0.6f) {
 
                             val statusMessage = "Show Actual Face"
                             Log.d("acceptV3", statusMessage)
                             SessionManager.lightCondition = 0
                             SessionManager.setText(statusMessage)
                         }
-                        else{
-                            Log.d("acceptV3", "Perfect! Hold on")
-                            SessionManager.lightCondition = 1
-                            SessionManager.setText("Perfect! Hold on")
-                        }
+                    else if (faceStrictEnabled && ConfidenceScore  != null && ConfidenceScore < 0.6f) {
+
+                        val statusMessage = "Face confidence low"
+                        Log.d("acceptV3", statusMessage)
+                        SessionManager.lightCondition = 0
+                        SessionManager.setText(statusMessage)
+                    }
+                    else{
+                        Log.d("acceptV3", "Perfect! Hold on")
+                        SessionManager.lightCondition = 1
+                        SessionManager.setText("Perfect! Hold on")
+                    }
 
 
                 }
