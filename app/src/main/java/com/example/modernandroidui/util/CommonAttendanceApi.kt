@@ -16,7 +16,7 @@ object CommonAttendanceApi {
         attendancePayloads: List<Map<String, Any>>
     ): Pair<Boolean, String?> = withContext(Dispatchers.IO) {
         val client = OkHttpClient()
-        val url = "https://web.nithrapeople.com/v1/api/common-api-attendance-store"
+        val url = "https://app.nithrapeople.com/api/mark-attendance"
         val mediaType = "application/json".toMediaTypeOrNull()
         val batchSize = 8
         val responses = mutableListOf<String>()

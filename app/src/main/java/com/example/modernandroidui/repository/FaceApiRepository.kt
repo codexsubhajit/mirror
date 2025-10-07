@@ -11,8 +11,13 @@ import org.json.JSONObject
 object FaceApiRepository {
     suspend fun deleteFaceFromApi(empID: String, bearerToken: String): Boolean = withContext(Dispatchers.IO) {
         val client = OkHttpClient()
-        val url = "https://web.nithrapeople.com/v1/api/face_delete"
-        val json = JSONObject().apply { put("employeeid", empID) }
+        val url = "https://app.nithrapeople.com/api/face_delete"
+        val json = JSONObject().apply {
+            put("employeeid", empID)
+            put("face_status", false)
+        }
+
+
         val body = RequestBody.create("application/json".toMediaType(), json.toString())
         val request = Request.Builder()
             .url(url)

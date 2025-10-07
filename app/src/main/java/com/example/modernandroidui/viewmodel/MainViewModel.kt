@@ -470,7 +470,7 @@ class MainViewModel : ViewModel() {
                         var offset = 0
                         val allEmployees = mutableListOf<JSONObject>()
                         while (offset < totalCount) {
-                            Log.e("ChaquopyMerge", "getsyncemployees offset $offset")
+                            Log.e("ChaquopyMerge", "getsyncemployees offset $totalCount")
                             val syncUrl =
                                 URL("https://app.nithrapeople.com/api/getsyncemployees")
                             val syncConn = syncUrl.openConnection() as HttpURLConnection
@@ -484,14 +484,22 @@ class MainViewModel : ViewModel() {
                             syncConn.outputStream.use { it.write(body.toString().toByteArray()) }
                             val syncResponse = syncConn.inputStream.bufferedReader().readText()
                             val syncJson = JSONObject(syncResponse)
+                            val message = syncJson.optString("message")
+//                            Log.i("ChaquopyMerge", "message $message")
+
                             //val employeeList =
                             //    syncJson.optJSONObject("data")?.optJSONArray("employee_list")
                             val employeeList = syncJson.optJSONArray("data")
-                            Log.i("mainViewModel EMP list", employeeList as String)
+//                            Log.i("mainViewModel EMP list", "employeeList $employeeList")
 
                             var fetched = 0
                             if (employeeList != null) {
+                                SessionManager.saveEmployerId(context, employeeList.getJSONObject(0).optInt("client_id"))
+
                                 for (i in 0 until employeeList.length()) {
+                                    val n_emp = employeeList.getJSONObject(i);
+
+                                    Log.i("ChaquopyMerge", "single emp $n_emp")
                                     allEmployees.add(employeeList.getJSONObject(i))
                                 }
                                 fetched = employeeList.length()
@@ -519,7 +527,7 @@ class MainViewModel : ViewModel() {
                             if (branch.isNotBlank()) branchSet.add(branch)
                             if (department.isNotBlank()) departmentSet.add(department)
                             val mirrorImage = emp.optString("mirror_image", null)
-                            val jsonTrackData = emp.optJSONObject("json_trackedata")
+                            val jsonTrackData = emp.optString("json_trackdata")
                             var faceRegistered = false
                             var faceId: Long? = null
                             if (jsonTrackData != null) {
@@ -588,11 +596,11 @@ class MainViewModel : ViewModel() {
 //                        )
                         val jsonTrackDataFiles = mutableListOf<File>()
                         for (emp in allEmployees) {
-                            val jsonTrackData = emp.optJSONObject("json_trackedata")
+                            val jsonTrackData = emp.optString("json_trackdata")
                             if (jsonTrackData != null) {
                                 val fileName = "emp_${emp.optInt("id")}_trackdata.json"
                                 val file = File(context.filesDir, fileName)
-                                file.writeText(jsonTrackData.toString())
+                                file.writeText(jsonTrackData)
                                 jsonTrackDataFiles.add(file)
                             }
                         }

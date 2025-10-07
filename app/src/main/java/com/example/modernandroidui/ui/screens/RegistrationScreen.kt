@@ -453,7 +453,7 @@ fun RegistrationScreen(
                                     // 4. Upload to API
                                     if (jsonString != null && faceJpgBase64 != null) {
                                         try {
-                                            val apiUrl = "https://web.nithrapeople.com/v1/api/face_register"
+                                            val apiUrl = "https://app.nithrapeople.com/api/face_register"
                                             val body = okhttp3.MultipartBody.Builder()
                                                 .setType(okhttp3.MultipartBody.FORM)
                                                 .addFormDataPart("employeeid", empID)
